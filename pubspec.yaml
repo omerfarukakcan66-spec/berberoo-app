@@ -1,0 +1,27 @@
+name: barberoo
+description: Barberoo — Salon-App (Flutter-Portierung, 1:1 zum HTML-Prototyp)
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Zustand & Persistenz
+  provider: ^6.1.2
+  shared_preferences: ^2.2.3
+
+  # Optik (exakt wie im Original)
+  google_fonts: ^6.2.1      # Hanken Grotesk + Instrument Serif
+  flutter_svg: ^2.0.10+1    # identische Icon-Pfade aus dem HTML
+  url_launcher: ^6.3.0      # Anrufen / E-Mail aus dem Kundendetail
+
+dev_dependencies:
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
