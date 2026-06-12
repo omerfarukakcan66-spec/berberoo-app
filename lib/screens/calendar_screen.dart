@@ -348,7 +348,7 @@ ApptTile _calendarApptTile(
   );
 }
 
-/// Tagesansicht mit Stunden-Timeline (.DayTimeline)
+/// Tagesansicht mit 30-Min-Timeline (.DayTimeline)
 class _DayTimeline extends StatelessWidget {
   final AppStore store;
   final String date;
@@ -363,67 +363,173 @@ class _DayTimeline extends StatelessWidget {
     final list = store.appts.where((a) => a.date == date).toList()
       ..sort((a, b) => a.time.compareTo(b.time));
     final sum = list.fold<double>(0, (s, a) => s + a.price);
-    final hours = [for (int h = 8; h <= 19; h++) h];
+
+    // 30-Min-Slots innerhalb Arbeitszeiten
+    final startMin = store.workStart * 60;
+    final endMin = store.workEnd * 60;
+    final slots = <int>[];
+    for (int m = startMin; m < endMin; m += 30) {
+      slots.add(m);
+    }
+
+    // Slots rendern — Termine überspannen, freie Lücken sichtbar machen
+    final rows = <Widget>[];
+    int skipUntil = -1;
+    int? freeFrom;
+
+    void flushFree(int until) {
+      if (freeFrom != null) {
+        rows.add(_FreeSlot(fromMin: freeFrom!, toMin: until));
+        freeFrom = null;
+      }
+    }
+
+    for (final slotMin in slots) {
+      // Termin der in diesem Slot beginnt?
+      final appt = list.cast<Appointment?>().firstWhere(
+        (a) => D.minutesOf(a!.time) >= slotMin && D.minutesOf(a.time) < slotMin + 30,
+        orElse: () => null,
+      );
+
+      if (appt != null) {
+        flushFree(slotMin);
+        skipUntil = D.minutesOf(appt.time) + appt.duration;
+        rows.add(_SlotRow(
+          slotMin: slotMin,
+          c: c,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _TimelineAppt(store: store, a: appt, onTap: () => onOpen(appt)),
+            ],
+          ),
+        ));
+      } else if (slotMin < skipUntil) {
+        // von laufendem Termin überdeckt — überspringen
+        continue;
+      } else {
+        // freier Slot
+        freeFrom ??= slotMin;
+      }
+    }
+    flushFree(endMin);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SectionTitle(D.fmtRel(date), trailing: Pill('${list.length} · ${D.euro(sum)} €')),
-        Column(
-          children: [
-            for (final h in hours)
-              IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 46,
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 8, right: 12),
-                        child: Text('${D.pad(h)}:00',
-                            textAlign: TextAlign.right,
-                            style: TextStyle(
-                                fontSize: 12, fontWeight: FontWeight.w600, color: c.text3)),
-                      ),
-                    ),
-                    Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          border: Border(top: BorderSide(color: c.line)),
-                        ),
-                        padding: const EdgeInsets.only(top: 6, bottom: 10),
-                        child: _hourBody(context, list, h),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
+        ...rows,
         const SizedBox(height: 14),
         AppButton('Termin hinzufügen', icon: 'plus', onTap: () => onAdd(date)),
       ],
     );
   }
+}
 
-  Widget _hourBody(BuildContext context, List<Appointment> list, int h) {
-    final c = context.c;
-    final inHour =
-        list.where((a) => D.minutesOf(a.time) >= h * 60 && D.minutesOf(a.time) < (h + 1) * 60).toList();
-    if (inHour.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
-        child: Text('frei',
-            style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: c.text3)),
-      );
-    }
-    return Column(
-      children: [
-        for (final a in inHour) ...[
-          _TimelineAppt(store: store, a: a, onTap: () => onOpen(a)),
-          if (a != inHour.last) const SizedBox(height: 8),
+class _SlotRow extends StatelessWidget {
+  final int slotMin;
+  final AppColors c;
+  final Widget child;
+  const _SlotRow({required this.slotMin, required this.c, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final h = slotMin ~/ 60;
+    final m = slotMin % 60;
+    final label = '${D.pad(h)}:${D.pad(m)}';
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 46,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 10, right: 12),
+              child: Text(label,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: c.text3)),
+            ),
+          ),
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(border: Border(top: BorderSide(color: c.line))),
+              padding: const EdgeInsets.only(top: 6, bottom: 8),
+              child: child,
+            ),
+          ),
         ],
-      ],
+      ),
+    );
+  }
+}
+
+class _FreeSlot extends StatelessWidget {
+  final int fromMin;
+  final int toMin;
+  const _FreeSlot({required this.fromMin, required this.toMin});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final fh = fromMin ~/ 60, fm = fromMin % 60;
+    final th = toMin ~/ 60, tm = toMin % 60;
+    final label = '${D.pad(fh)}:${D.pad(fm)}';
+    final dauer = toMin - fromMin;
+    final durLabel = dauer >= 60
+        ? '${dauer ~/ 60} Std${dauer % 60 > 0 ? ' ${dauer % 60} Min' : ''} frei'
+        : '$dauer Min frei';
+    final endLabel = '${D.pad(th)}:${D.pad(tm)}';
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 46,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 10, right: 12),
+              child: Text(label,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: c.text3)),
+            ),
+          ),
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 4),
+              decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: c.line)),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 3,
+                    height: 32,
+                    margin: const EdgeInsets.only(right: 10),
+                    decoration: BoxDecoration(
+                      color: c.ok.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(durLabel,
+                            style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: c.ok)),
+                        Text('bis $endLabel Uhr',
+                            style: TextStyle(fontSize: 12, color: c.text3)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

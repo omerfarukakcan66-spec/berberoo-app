@@ -91,6 +91,44 @@ class SettingsScreen extends StatelessWidget {
                         ),
                       ),
 
+                      // ---------- Arbeitszeiten ----------
+                      const SectionTitle('Arbeitszeiten'),
+                      AppCard(
+                        onTap: () => _editWorkHours(context, store),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: c.accentSoft,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: AppIcon('clock', size: 20, color: c.accentBright),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const LabelText('Arbeitszeiten'),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    '${_fmtH(store.workStart)} – ${_fmtH(store.workEnd)} Uhr',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 16,
+                                        color: c.text),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            AppIcon('edit', size: 19, color: c.text3),
+                          ],
+                        ),
+                      ),
+
                       // ---------- Salon ----------
                       const SectionTitle('Salon'),
                       AppCard(
@@ -198,6 +236,57 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
+  static String _fmtH(int h) => '${h.toString().padLeft(2, '0')}:00';
+
+  void _editWorkHours(BuildContext context, AppStore store) {
+    int start = store.workStart;
+    int end = store.workEnd;
+    showAppSheet(
+      context: context,
+      title: 'Arbeitszeiten',
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSt) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: AppField(
+                    label: 'Beginn',
+                    child: _HourPicker(
+                      value: start,
+                      min: 0,
+                      max: end - 1,
+                      onChange: (v) => setSt(() => start = v),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: AppField(
+                    label: 'Ende',
+                    child: _HourPicker(
+                      value: end,
+                      min: start + 1,
+                      max: 24,
+                      onChange: (v) => setSt(() => end = v),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            AppButton('Speichern', variant: BtnVariant.primary, onTap: () {
+              store.setWorkHours(start, end);
+              Toast.show(ctx, 'Gespeichert');
+              Navigator.of(ctx).pop();
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _editSalon(BuildContext context, AppStore store) {
     final ctrl = TextEditingController(text: store.salon);
     showAppSheet(
@@ -257,6 +346,58 @@ class _ThemeOption extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                     color: active ? c.accentBright : c.text2)),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HourPicker extends StatelessWidget {
+  final int value;
+  final int min;
+  final int max;
+  final ValueChanged<int> onChange;
+  const _HourPicker({required this.value, required this.min, required this.max, required this.onChange});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Container(
+      height: 50,
+      decoration: BoxDecoration(
+        color: c.surface2,
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: c.line),
+      ),
+      child: Row(
+        children: [
+          _btn(c, '−', value > min ? () => onChange(value - 1) : null),
+          Expanded(
+            child: Text(
+              '${value.toString().padLeft(2, '0')}:00',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.text),
+            ),
+          ),
+          _btn(c, '+', value < max ? () => onChange(value + 1) : null),
+        ],
+      ),
+    );
+  }
+
+  Widget _btn(AppColors c, String label, VoidCallback? onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 44,
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w400,
+            color: onTap != null ? c.accentBright : c.text3,
+          ),
         ),
       ),
     );

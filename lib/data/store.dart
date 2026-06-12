@@ -15,6 +15,8 @@ class AppStore extends ChangeNotifier {
   List<Todo> todos = [];
   String salon = 'Barberoo';
   bool seeded = false;
+  int workStart = 9;  // Arbeitszeit Beginn (Stunde)
+  int workEnd = 18;   // Arbeitszeit Ende (Stunde)
 
   late SharedPreferences _prefs;
 
@@ -44,6 +46,8 @@ class AppStore extends ChangeNotifier {
     todos = (j['todos'] as List? ?? []).map((e) => Todo.fromJson(e)).toList();
     salon = j['salon'] ?? 'Barberoo';
     seeded = j['seeded'] ?? false;
+    workStart = j['workStart'] ?? 9;
+    workEnd = j['workEnd'] ?? 18;
   }
 
   Map<String, dynamic> _toJson() => {
@@ -53,6 +57,8 @@ class AppStore extends ChangeNotifier {
         'todos': todos.map((e) => e.toJson()).toList(),
         'salon': salon,
         'seeded': seeded,
+        'workStart': workStart,
+        'workEnd': workEnd,
       };
 
   Future<void> _save() async => _prefs.setString(_key, jsonEncode(_toJson()));
@@ -153,6 +159,12 @@ class AppStore extends ChangeNotifier {
   // ---------------- Salon-Name ----------------
   void setSalon(String name) {
     salon = name.trim().isEmpty ? 'Barberoo' : name.trim();
+    _commit();
+  }
+
+  void setWorkHours(int start, int end) {
+    workStart = start.clamp(0, 23);
+    workEnd = end.clamp(1, 24);
     _commit();
   }
 
