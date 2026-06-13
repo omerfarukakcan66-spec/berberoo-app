@@ -179,6 +179,21 @@ class AppStore extends ChangeNotifier {
     _commit();
   }
 
+  /// Alle Daten als JSON-String exportieren.
+  String exportJson() => jsonEncode(_toJson());
+
+  /// Daten aus JSON-String importieren. Gibt Fehlertext zurück oder null bei Erfolg.
+  String? importJson(String raw) {
+    try {
+      final j = jsonDecode(raw) as Map<String, dynamic>;
+      _applyJson(j);
+      _commit();
+      return null;
+    } catch (e) {
+      return 'Ungültige Datei: $e';
+    }
+  }
+
   void _applyEmpty() {
     services = [];
     customers = [];

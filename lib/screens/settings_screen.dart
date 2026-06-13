@@ -1,5 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../data/store.dart';
@@ -165,6 +169,21 @@ class SettingsScreen extends StatelessWidget {
                         ),
                       ),
 
+                      // ---------- Sicherung ----------
+                      const SectionTitle('Sicherung'),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(2, 0, 2, 12),
+                        child: Text(
+                          'Exportiere deine Daten vor einem Update. Importiere sie danach wieder.',
+                          style: TextStyle(fontSize: 13.5, color: c.text2, height: 1.45),
+                        ),
+                      ),
+                      AppButton('Daten exportieren', icon: 'share',
+                          onTap: () => _export(context, store)),
+                      const SizedBox(height: 10),
+                      AppButton('Daten importieren', icon: 'download',
+                          onTap: () => _import(context, store)),
+
                       // ---------- Daten ----------
                       const SectionTitle('Daten'),
                       Padding(
@@ -232,6 +251,77 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Future<void> _export(BuildContext context, AppStore store) async {
+    try {
+      final json = store.exportJson();
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/barberoo_sicherung.json');
+      await file.writeAsString(json);
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: 'application/json')],
+        subject: 'Barberoo Sicherung',
+      );
+    } catch (e) {
+      if (context.mounted) Toast.show(context, 'Export fehlgeschlagen');
+    }
+  }
+
+  void _import(BuildContext context, AppStore store) {
+    final ctrl = TextEditingController();
+    showAppSheet(
+      context: context,
+      title: 'Daten importieren',
+      builder: (ctx) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(2, 0, 2, 12),
+            child: Text(
+              'Füge den Inhalt deiner Sicherungsdatei hier ein.',
+              style: TextStyle(fontSize: 13.5, color: ctx.c.text2),
+            ),
+          ),
+          AppField(
+            label: 'JSON einfügen',
+            child: AppTextField(
+              controller: ctrl,
+              hint: '{"services": [...], "customers": [...], ...}',
+              minLines: 4,
+              maxLines: 8,
+            ),
+          ),
+          const SizedBox(height: 4),
+          AppButton('Aus Zwischenablage', onTap: () async {
+            final data = await Clipboard.getData('text/plain');
+            if (data?.text != null) ctrl.text = data!.text!;
+          }),
+          const SizedBox(height: 10),
+          AppButton('Importieren & Wiederherstellen',
+              variant: BtnVariant.primary,
+              onTap: () {
+                if (ctrl.text.trim().isEmpty) return;
+                showConfirm(
+                  ctx,
+                  title: 'Daten überschreiben?',
+                  message: 'Aktuelle Daten werden durch die Sicherung ersetzt.',
+                  confirmLabel: 'Importieren',
+                  danger: true,
+                  onConfirm: () {
+                    final err = store.importJson(ctrl.text.trim());
+                    if (err != null) {
+                      Toast.show(ctx, err);
+                    } else {
+                      Toast.show(ctx, 'Daten wiederhergestellt ✓');
+                      Navigator.of(ctx).pop();
+                    }
+                  },
+                );
+              }),
+        ],
       ),
     );
   }
