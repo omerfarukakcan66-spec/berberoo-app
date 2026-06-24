@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 import '../theme/app_colors.dart';
 import '../data/models.dart';
 import '../data/store.dart';
 import '../data/date_utils.dart';
 import '../widgets/common.dart';
 import '../widgets/inputs.dart';
+import '../widgets/press_scale.dart';
+import '../widgets/app_icon.dart';
 import '../widgets/toast.dart';
 
 /// Kundenformular — Portierung von CustomerForm (forms.jsx).
@@ -38,6 +41,27 @@ class _CustomerFormState extends State<CustomerForm> {
     super.dispose();
   }
 
+  Future<void> _pickContact() async {
+    try {
+      final granted = await FlutterContacts.requestPermission();
+      if (!granted) {
+        if (mounted) Toast.show(context, 'Kontakte-Zugriff verweigert');
+        return;
+      }
+      final contact = await FlutterContacts.openExternalPick();
+      if (contact == null) return;
+      final full = await FlutterContacts.getContact(contact.id);
+      if (full == null) return;
+      setState(() {
+        _name.text = full.displayName;
+        if (full.phones.isNotEmpty) _phone.text = full.phones.first.number;
+        if (full.emails.isNotEmpty) _email.text = full.emails.first.address;
+      });
+    } catch (_) {
+      if (mounted) Toast.show(context, 'Kontakt konnte nicht geladen werden');
+    }
+  }
+
   void _submit() {
     if (_name.text.trim().isEmpty) {
       setState(() => err = 'Bitte einen Namen eingeben.');
@@ -63,6 +87,33 @@ class _CustomerFormState extends State<CustomerForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (base == null) ...[
+          PressScale(
+            onTap: _pickContact,
+            child: Container(
+              height: 50,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: context.c.accentSoft,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: context.c.accentLine),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  AppIcon('users', size: 19, color: context.c.accentBright),
+                  const SizedBox(width: 8),
+                  Text('Aus Kontakten importieren',
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: context.c.accentBright)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+        ],
         AppField(
           label: 'Name',
           child: AppTextField(

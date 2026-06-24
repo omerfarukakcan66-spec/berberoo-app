@@ -20,6 +20,7 @@ dependencies:
   flutter_svg: ^2.0.10+1    # identische Icon-Pfade aus dem HTML
   url_launcher: ^6.3.0      # Anrufen / E-Mail aus dem Kundendetail
   share_plus: ^10.0.0       # Export-Datei via iOS Share-Sheet
+  flutter_contacts: ^1.1.9+2  # Kontakte aus Telefonbuch importieren
 
 dev_dependencies:
   flutter_lints: ^4.0.0
